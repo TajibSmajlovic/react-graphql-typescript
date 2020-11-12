@@ -1,4 +1,5 @@
 import argon2 from "argon2";
+import { EntityManager } from "@mikro-orm/postgresql";
 import {
   Arg,
   Ctx,
@@ -57,36 +58,47 @@ export class UserResolver {
   async register(
     @Arg("options", () => UsernamePasswordInput)
     options: UsernamePasswordInput,
-    @Ctx() { em }: MyContext
+    @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
-    if (!options.username.length)
-      return {
-        errors: [
-          {
-            field: "username",
-            message: "Username can't be empty",
-          },
-        ],
-      };
+    const errors: FieldError[] = [];
 
-    if (options.password.length <= 6)
-      return {
-        errors: [
-          {
-            field: "password",
-            message: "Password must be at least 6 characters long",
-          },
-        ],
-      };
+    if (!options.username.length)
+      errors.push({
+        field: "username",
+        message: "Username can't be empty",
+      });
+
+    if (options.password.length <= 6) {
+      errors.push({
+        field: "password",
+        message: "Password must be at least 6 characters long",
+      });
+
+      return { errors };
+    }
 
     const hashedPassword = await argon2.hash(options.password);
-    const user = em.create(User, {
-      username: options.username,
-      password: hashedPassword,
-    });
+    // const user = em.create(User, {
+    //   username: options.username,
+    //   password: hashedPassword,
+    // });
+
+    let user: User;
 
     try {
-      await em.persistAndFlush(user);
+      const [responseUser] = await (em as EntityManager)
+        .createQueryBuilder(User)
+        .getKnexQuery()
+        .insert({
+          username: options.username,
+          password: hashedPassword,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })
+        .returning("*");
+      user = responseUser;
+
+      // await em.persistAndFlush(user);
     } catch (error) {
       if (error.code === "23505")
         return {
@@ -107,10 +119,12 @@ export class UserResolver {
         };
     }
 
+    req.session.userId = user.id;
+
     return { user };
   }
 
-  @Query(() => UserResponse)
+  @Mutation(() => UserResponse)
   async login(
     @Arg("options", () => UsernamePasswordInput)
     options: UsernamePasswordInput,

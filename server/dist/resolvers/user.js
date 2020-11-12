@@ -77,33 +77,35 @@ let UserResolver = class UserResolver {
             return null;
         });
     }
-    register(options, { em }) {
+    register(options, { em, req }) {
         return __awaiter(this, void 0, void 0, function* () {
+            const errors = [];
             if (!options.username.length)
-                return {
-                    errors: [
-                        {
-                            field: "username",
-                            message: "Username can't be empty",
-                        },
-                    ],
-                };
-            if (options.password.length <= 6)
-                return {
-                    errors: [
-                        {
-                            field: "password",
-                            message: "Password must be at least 6 characters long",
-                        },
-                    ],
-                };
+                errors.push({
+                    field: "username",
+                    message: "Username can't be empty",
+                });
+            if (options.password.length <= 6) {
+                errors.push({
+                    field: "password",
+                    message: "Password must be at least 6 characters long",
+                });
+                return { errors };
+            }
             const hashedPassword = yield argon2_1.default.hash(options.password);
-            const user = em.create(User_1.User, {
-                username: options.username,
-                password: hashedPassword,
-            });
+            let user;
             try {
-                yield em.persistAndFlush(user);
+                const [responseUser] = yield em
+                    .createQueryBuilder(User_1.User)
+                    .getKnexQuery()
+                    .insert({
+                    username: options.username,
+                    password: hashedPassword,
+                    created_at: new Date(),
+                    updated_at: new Date(),
+                })
+                    .returning("*");
+                user = responseUser;
             }
             catch (error) {
                 if (error.code === "23505")
@@ -124,6 +126,7 @@ let UserResolver = class UserResolver {
                         ],
                     };
             }
+            req.session.userId = user.id;
             return { user };
         });
     }
@@ -172,7 +175,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], UserResolver.prototype, "register", null);
 __decorate([
-    type_graphql_1.Query(() => UserResponse),
+    type_graphql_1.Mutation(() => UserResponse),
     __param(0, type_graphql_1.Arg("options", () => UsernamePasswordInput)),
     __param(1, type_graphql_1.Ctx()),
     __metadata("design:type", Function),
