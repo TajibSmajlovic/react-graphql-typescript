@@ -1,22 +1,77 @@
-import React from "react";
-import { Spinner } from "@chakra-ui/core";
+import React, { useState } from "react";
+import NextLink from "next/link";
+import { Box, Button, Flex, Heading, Link, Stack, Text } from "@chakra-ui/core";
 import { withUrqlClient } from "next-urql";
 
-import { NavBar } from "../components/Layout/NavBar";
 import { usePostsQuery } from "../generated/graphql";
 import { createUrqlClient } from "../utils/createUrqlClient";
+import { Layout } from "../components/Layout/Layout";
 
 const Index = () => {
-  const [{ data, fetching }] = usePostsQuery();
+  const [variables, setVariables] = useState({
+    limit: 10,
+    cursor: null as null | string,
+  });
+  const [{ data, fetching }] = usePostsQuery({ variables });
+
+  if (!fetching && !data) return <div>No posts!</div>;
 
   return (
-    <>
-      <NavBar />
-      <div>Hello World!</div>
-      {fetching && <Spinner />}
+    <Layout>
+      <Flex align="center">
+        <Heading>LiReddit</Heading>
+
+        <NextLink href="/create-post">
+          <Link ml="auto">Create post</Link>
+        </NextLink>
+      </Flex>
+
       <br />
-      {data && data.getPosts.map((p) => <div key={p.id}>{p.title}</div>)}
-    </>
+
+      <Stack spacing={8}>
+        {fetching && !data
+          ? "Loading..."
+          : data!.getPosts.items.map((p) =>
+              !p ? null : (
+                <Flex key={p.id} p={5} shadow="md" borderWidth="1px">
+                  {/* <UpdootSection post={p} /> */}
+                  <Box flex={1}>
+                    <NextLink href="/post/[id]" as={`/post/${p.id}`}>
+                      <Link>
+                        <Heading fontSize="xl">{p.title}</Heading>
+                      </Link>
+                    </NextLink>
+                    <Text>posted by {p.creatorId}</Text>
+                    <Flex align="center">
+                      <Text flex={1} mt={4}>
+                        {p.textSnippet}
+                      </Text>
+                    </Flex>
+                  </Box>
+                </Flex>
+              )
+            )}
+      </Stack>
+
+      {data && data.getPosts.hasMore && (
+        <Flex>
+          <Button
+            m="auto"
+            my={8}
+            isLoading={fetching}
+            onClick={() =>
+              setVariables({
+                limit: variables.limit,
+                cursor:
+                  data.getPosts.items[data.getPosts.items.length - 1].createdAt,
+              })
+            }
+          >
+            Load more
+          </Button>
+        </Flex>
+      )}
+    </Layout>
   );
 };
 

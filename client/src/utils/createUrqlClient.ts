@@ -1,5 +1,17 @@
-import { dedupExchange, fetchExchange } from "urql";
-import { cacheExchange, Cache, QueryInput } from "@urql/exchange-graphcache";
+import Router from "next/router";
+import { pipe, tap } from "wonka";
+import {
+  dedupExchange,
+  Exchange,
+  fetchExchange,
+  stringifyVariables,
+} from "urql";
+import {
+  cacheExchange,
+  Cache,
+  QueryInput,
+  Resolver,
+} from "@urql/exchange-graphcache";
 
 import {
   LoginMutation,
@@ -17,6 +29,14 @@ export const createUrqlClient = (ssrExchange: any) => ({
   exchanges: [
     dedupExchange,
     cacheExchange({
+      keys: {
+        PaginatedPostsResponse: () => null,
+      },
+      resolvers: {
+        Query: {
+          getPosts: cursorPagination(),
+        },
+      },
       updates: {
         Mutation: {
           login: (_result, _1, cache, _2) => {
@@ -54,6 +74,7 @@ export const createUrqlClient = (ssrExchange: any) => ({
         },
       },
     }),
+    errorExchange,
     ssrExchange,
     fetchExchange,
   ],
@@ -67,3 +88,53 @@ function updateQuery<Result, Query>(
 ) {
   return cache.updateQuery(qi, (data) => fn(result, data as any) as any);
 }
+
+const errorExchange: Exchange = ({ forward }) => (ops$) => {
+  return pipe(
+    forward(ops$),
+    tap(({ error }) => {
+      if (error?.message.includes("Not authenticated"))
+        Router.replace("/login");
+    })
+  );
+};
+
+const cursorPagination = (): Resolver => {
+  return (_parent, fieldArgs, cache, info) => {
+    const { parentKey: entityKey, fieldName } = info;
+    const allFields = cache.inspectFields(entityKey);
+    const fieldInfos = allFields.filter((info) => info.fieldName === fieldName);
+    const size = fieldInfos.length;
+    if (size === 0) {
+      return undefined;
+    }
+
+    const fieldKey = `${fieldName}(${stringifyVariables(fieldArgs)})`;
+    const isItInTheCache = cache.resolve(
+      cache.resolveFieldByKey(entityKey, fieldKey) as string,
+      "posts"
+    );
+
+    info.partial = !isItInTheCache;
+
+    let hasMore = true;
+    const results: string[] = [];
+    fieldInfos.forEach((fi) => {
+      const key = cache.resolveFieldByKey(entityKey, fi.fieldKey) as string;
+      const data = cache.resolve(key, "items") as string[];
+      const _hasMore = cache.resolve(key, "hasMore");
+
+      if (!_hasMore) {
+        hasMore = _hasMore as boolean;
+      }
+
+      results.push(...data);
+    });
+
+    return {
+      __typename: "PaginatedPostsResponse",
+      hasMore,
+      items: results,
+    };
+  };
+};
