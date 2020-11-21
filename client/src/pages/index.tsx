@@ -3,9 +3,10 @@ import NextLink from "next/link";
 import { Box, Button, Flex, Heading, Link, Stack, Text } from "@chakra-ui/core";
 import { withUrqlClient } from "next-urql";
 
+import Updoot from "../components/Updoot/Updoot";
+import { Layout } from "../components/Layout/Layout";
 import { usePostsQuery } from "../generated/graphql";
 import { createUrqlClient } from "../utils/createUrqlClient";
-import { Layout } from "../components/Layout/Layout";
 
 const Index = () => {
   const [variables, setVariables] = useState({
@@ -34,14 +35,16 @@ const Index = () => {
           : data!.getPosts.items.map((p) =>
               !p ? null : (
                 <Flex key={p.id} p={5} shadow="md" borderWidth="1px">
-                  {/* <UpdootSection post={p} /> */}
+                  <Updoot post={p} />
                   <Box flex={1}>
                     <NextLink href="/post/[id]" as={`/post/${p.id}`}>
                       <Link>
                         <Heading fontSize="xl">{p.title}</Heading>
                       </Link>
                     </NextLink>
-                    <Text>posted by {p.creatorId}</Text>
+                    <Text>
+                      posted by <b>{p.creator.username}</b>
+                    </Text>
                     <Flex align="center">
                       <Text flex={1} mt={4}>
                         {p.textSnippet}

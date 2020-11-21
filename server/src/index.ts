@@ -14,6 +14,7 @@ import { UserResolver } from "./resolvers/user";
 import { COOKIE_NAME, isProduction } from "./utils/constants";
 import { Post } from "./entities/Post";
 import { User } from "./entities/User";
+import { Updoot } from "./entities/Updoot";
 
 const main = async () => {
   const connection = await createConnection({
@@ -24,13 +25,13 @@ const main = async () => {
     logging: true,
     synchronize: true,
     migrations: [path.join(__dirname, "./migrations/*")],
-    entities: [Post, User],
+    entities: [Post, User, Updoot],
   });
 
   // await Post.delete({});
 
   connection.runMigrations();
-  console.log(connection);
+  // console.log(connection);
 
   const app = express();
   const RedisStore = connectRedis(session);
@@ -51,7 +52,7 @@ const main = async () => {
         disableTouch: true,
       }),
       cookie: {
-        maxAge: 1000 * 60 * 2, // 2 minutes
+        maxAge: 1000 * 60 * 60, // 60 minutes
         httpOnly: true,
         sameSite: "lax",
         secure: isProduction, // cookie only works in https
