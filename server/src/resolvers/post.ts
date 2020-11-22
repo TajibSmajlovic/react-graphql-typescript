@@ -61,7 +61,13 @@ export class PostResolver {
     // const posts = await queryBuilder.getMany();
 
     const replacements: any[] = [realLimitPlusOne];
-    if (cursor) replacements.push(new Date(parseInt(cursor)));
+    if (loggedInUserId) replacements.push(loggedInUserId);
+
+    let cursorIdx = 2;
+    if (cursor) {
+      replacements.push(new Date(parseInt(cursor)));
+      cursorIdx = replacements.length;
+    }
 
     const posts: Post[] = await getConnection().query(
       `
@@ -70,36 +76,41 @@ export class PostResolver {
           'id', u.id,
           'username', u.username,
           'email', u.email
-        ) creator
+        ) creator,
+        ${
+          loggedInUserId
+            ? `(select value from updoot where "userId" = $2 and "postId" = p.id) "voteStatus"`
+            : `null as "voteStatus"`
+        }
         from post p
         inner join public.user u on u.id = p."creatorId"
-        ${cursor ? `where p."createdAt" < $2` : ""}
+        ${cursor ? `where p."createdAt" < $${cursorIdx}` : ""}
         order by p."createdAt" DESC
         limit $1
       `,
       replacements
     );
 
-    const votes: Updoot[] = [];
-    const fetchedPostIds = posts.map((p) => p.id);
-    if (loggedInUserId) {
-      const updoots: Updoot[] = await getConnection().query(
-        `
-          select u.* from updoot u
-          where u."userId" = $1 and
-          u."postId" in (${fetchedPostIds})
-   `,
-        [loggedInUserId]
-      );
+    //   const votes: Updoot[] = [];
+    //   const fetchedPostIds = posts.map((p) => p.id);
+    //   if (loggedInUserId) {
+    //     const updoots: Updoot[] = await getConnection().query(
+    //       `
+    //         select u.* from updoot u
+    //         where u."userId" = $1 and
+    //         u."postId" in (${fetchedPostIds})
+    //  `,
+    //       [loggedInUserId]
+    //     );
 
-      if (updoots.length) votes.push(...updoots);
-    }
+    //     if (updoots.length) votes.push(...updoots);
+    //   }
 
-    if (votes.length)
-      posts.forEach((p) => {
-        const postVotes = votes.filter((v) => v.postId === p.id);
-        if (postVotes.length) p.updoots = postVotes;
-      });
+    //   if (votes.length)
+    //     posts.forEach((p) => {
+    //       const postVotes = votes.filter((v) => v.postId === p.id);
+    //       if (postVotes.length) p.updoots = postVotes;
+    //     });
 
     return {
       items: posts.slice(0, realLimit),
@@ -223,8 +234,8 @@ export class PostResolver {
     return root.text.slice(0, 100);
   }
 
-  @FieldResolver(() => Int, { nullable: true })
-  async votedValue(@Root() root: Post) {
-    return root.updoots ? root.updoots[0].value : null;
-  }
+  // @FieldResolver(() => Int, { nullable: true })
+  // async votedValue(@Root() root: Post) {
+  //   return root.updoots ? root.updoots[0].value : null;
+  // }
 }
