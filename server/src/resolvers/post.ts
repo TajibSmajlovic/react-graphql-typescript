@@ -119,8 +119,28 @@ export class PostResolver {
   }
 
   @Query(() => Post, { nullable: true })
-  getPost(@Arg("id", () => Int) id: number) {
-    return Post.findOne(id);
+  async getPost(@Arg("id", () => Int) id: number) {
+    // return await Post.findOne(id);
+
+    if (id <= 0) return null;
+
+    // const post = await getConnection().query(
+    //   `
+    //     select p.*,
+    //     json_build_object(
+    //       'id', u.id,
+    //       'username', u.username,
+    //       'email', u.email
+    //     ) creator
+    //     from post p
+    //     inner join public.user u
+    //     on u.id = p."creatorId"
+    //     where p."id" = $1
+    // `,
+    //   [id]
+    // );
+
+    return await Post.findOne(id, { relations: ["creator"] });
   }
 
   @Mutation(() => Post)
@@ -143,29 +163,42 @@ export class PostResolver {
   }
 
   @Mutation(() => Post, { nullable: true })
+  @UseMiddleware(isAuth)
   async updatePost(
-    @Arg("id") id: number,
-    @Arg("title", () => String, { nullable: true }) title: string
+    @Arg("id", () => Int) id: number,
+    @Arg("title", () => String) title: string,
+    @Arg("text", () => String) text: string,
+    @Ctx() { req }: MyContext
   ) {
-    const post = await Post.findOne(id);
+    const result = await getConnection()
+      .createQueryBuilder()
+      .update(Post)
+      .set({ title, text })
+      .where('id = :id and "creatorId" = :creatorId', {
+        id,
+        creatorId: req.session.userId,
+      })
+      .returning("*")
+      .execute();
 
-    if (!post) return null;
-
-    if (typeof title !== "undefined") {
-      await Post.update({ id }, { title });
-    }
-
-    return post;
+    return result.raw[0];
   }
 
   @Mutation(() => Boolean)
-  async deletePost(@Arg("id") id: number) {
+  @UseMiddleware(isAuth)
+  async deletePost(
+    @Arg("id", () => Int) id: number,
+    @Ctx() { req }: MyContext
+  ) {
     try {
-      await Post.delete(id);
+      // const post = await Post.findOne(id);
+      // if (!post || post?.creatorId !== req.session.userId) Throw new Error("not authorized")
+
+      await Post.delete({ id, creatorId: req.session.userId });
 
       return true;
     } catch (error) {
-      return false;
+      throw new Error(error);
     }
   }
 

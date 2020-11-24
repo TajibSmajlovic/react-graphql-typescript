@@ -1,3 +1,4 @@
+import { UpdatePostMutationVariables } from "./../generated/graphql";
 import Router from "next/router";
 import gql from "graphql-tag";
 import { pipe, tap } from "wonka";
@@ -16,6 +17,7 @@ import {
 
 import { isServer } from "./helpers";
 import {
+  DeletePostMutationVariables,
   LoginMutation,
   LogoutMutation,
   MeDocument,
@@ -26,7 +28,7 @@ import {
 
 export const createUrqlClient = (ssrExchange: any, ctx: any) => {
   let cookie: string = "";
-  if (isServer()) cookie = ctx.req.headers.cookie;
+  if (isServer()) cookie = ctx?.req?.headers?.cookie;
 
   return {
     url: "http://localhost:5000/graphql",
@@ -97,6 +99,12 @@ export const createUrqlClient = (ssrExchange: any, ctx: any) => {
                 );
               });
             },
+            updatePost: (_result, args, cache, _2) => {
+              cache.invalidate({
+                __typename: "Post",
+                id: (args as UpdatePostMutationVariables).id,
+              });
+            },
             vote: (_result, args, cache, _2) => {
               // const allFields = cache.inspectFields("Query");
               // const fieldInfos = allFields.filter(
@@ -135,6 +143,12 @@ export const createUrqlClient = (ssrExchange: any, ctx: any) => {
                   { id: postId, points: newPoints, voteStatus: value } as any
                 );
               }
+            },
+            deletePost: (_result, args, cache, _2) => {
+              cache.invalidate({
+                __typename: "Post",
+                id: (args as DeletePostMutationVariables).id,
+              });
             },
           },
         },

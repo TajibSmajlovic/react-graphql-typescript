@@ -5,7 +5,8 @@ import { withUrqlClient } from "next-urql";
 
 import Updoot from "../components/Updoot/Updoot";
 import { Layout } from "../components/Layout/Layout";
-import { usePostsQuery } from "../generated/graphql";
+import { EditDeletePostButtons } from "../components/Button/EditDeleteButton";
+import { useDeletePostMutation, usePostsQuery } from "../generated/graphql";
 import { createUrqlClient } from "../utils/createUrqlClient";
 
 const Index = () => {
@@ -14,6 +15,7 @@ const Index = () => {
     cursor: null as null | string,
   });
   const [{ data, fetching }] = usePostsQuery({ variables });
+  const [, deletePost] = useDeletePostMutation();
 
   if (!fetching && !data) return <div>No posts!</div>;
 
@@ -42,13 +44,26 @@ const Index = () => {
                         <Heading fontSize="xl">{p.title}</Heading>
                       </Link>
                     </NextLink>
-                    <Text>
-                      posted by <b>{p.creator.username}</b>
-                    </Text>
-                    <Flex align="center">
-                      <Text flex={1} mt={4}>
-                        {p.textSnippet}
-                      </Text>
+                    <Flex>
+                      <Box>
+                        <Text>
+                          posted by <b>{p.creator.username}</b>
+                        </Text>
+                        <Flex align="center">
+                          <Text flex={1} mt={4}>
+                            {p.textSnippet}
+                          </Text>
+                        </Flex>
+                      </Box>
+                      <Box ml="auto">
+                        <EditDeletePostButtons
+                          id={p.id}
+                          creatorId={p.creator.id}
+                          onDelete={() => {
+                            deletePost({ id: p.id });
+                          }}
+                        />
+                      </Box>
                     </Flex>
                   </Box>
                 </Flex>
