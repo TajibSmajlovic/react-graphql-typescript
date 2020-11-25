@@ -64,6 +64,7 @@ export const createUrqlClient = (ssrExchange: any, ctx: any) => {
                   } else return { me: result.login.user };
                 }
               );
+              // invalidateAllPosts(cache)
             },
             register: (_result, _1, cache, _2) => {
               updateQuery<RegisterMutation, MeQuery>(
@@ -86,18 +87,7 @@ export const createUrqlClient = (ssrExchange: any, ctx: any) => {
               );
             },
             createPost: (_result, _1, cache, _2) => {
-              const allFields = cache.inspectFields("Query");
-              const fieldInfos = allFields.filter(
-                (info) => info.fieldName === "getPosts"
-              );
-
-              fieldInfos.forEach((fieldInfo) => {
-                cache.invalidate(
-                  "Query",
-                  "getPosts",
-                  fieldInfo.arguments || {}
-                );
-              });
+              invalidateAllPosts(cache);
             },
             updatePost: (_result, args, cache, _2) => {
               cache.invalidate({
@@ -159,6 +149,15 @@ export const createUrqlClient = (ssrExchange: any, ctx: any) => {
     ],
   };
 };
+
+function invalidateAllPosts(cache: Cache) {
+  const allFields = cache.inspectFields("Query");
+  const fieldInfos = allFields.filter((info) => info.fieldName === "getPosts");
+
+  fieldInfos.forEach((fieldInfo) => {
+    cache.invalidate("Query", "getPosts", fieldInfo.arguments || {});
+  });
+}
 
 function updateQuery<Result, Query>(
   cache: Cache,

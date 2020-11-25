@@ -61,35 +61,35 @@ export class PostResolver {
     // const posts = await queryBuilder.getMany();
 
     const replacements: any[] = [realLimitPlusOne];
-    if (loggedInUserId) replacements.push(loggedInUserId);
+    // if (loggedInUserId) replacements.push(loggedInUserId);
 
-    let cursorIdx = 2;
+    // let cursorIdx = 2;
     if (cursor) {
       replacements.push(new Date(parseInt(cursor)));
-      cursorIdx = replacements.length;
+      // cursorIdx = replacements.length;
     }
 
-    const posts: Post[] = await getConnection().query(
-      `
-        select p.*,
-        json_build_object(
-          'id', u.id,
-          'username', u.username,
-          'email', u.email
-        ) creator,
-        ${
-          loggedInUserId
-            ? `(select value from updoot where "userId" = $2 and "postId" = p.id) "voteStatus"`
-            : `null as "voteStatus"`
-        }
-        from post p
-        inner join public.user u on u.id = p."creatorId"
-        ${cursor ? `where p."createdAt" < $${cursorIdx}` : ""}
-        order by p."createdAt" DESC
-        limit $1
-      `,
-      replacements
-    );
+    // const posts: Post[] = await getConnection().query(
+    //   `
+    //     select p.*,
+    //     json_build_object(
+    //       'id', u.id,
+    //       'username', u.username,
+    //       'email', u.email
+    //     ) creator,
+    //     ${
+    //       loggedInUserId
+    //         ? `(select value from updoot where "userId" = $2 and "postId" = p.id) "voteStatus"`
+    //         : `null as "voteStatus"`
+    //     }
+    //     from post p
+    //     inner join public.user u on u.id = p."creatorId"
+    //     ${cursor ? `where p."createdAt" < $${cursorIdx}` : ""}
+    //     order by p."createdAt" DESC
+    //     limit $1
+    //   `,
+    //   replacements
+    // );
 
     //   const votes: Updoot[] = [];
     //   const fetchedPostIds = posts.map((p) => p.id);
@@ -111,6 +111,16 @@ export class PostResolver {
     //       const postVotes = votes.filter((v) => v.postId === p.id);
     //       if (postVotes.length) p.updoots = postVotes;
     //     });
+
+    const posts: Post[] = await getConnection().query(
+      `
+        select p.* from post p
+        ${cursor ? `where p."createdAt" < $2` : ""}
+        order by p."createdAt" DESC
+        limit $1
+      `,
+      replacements
+    );
 
     return {
       items: posts.slice(0, realLimit),
@@ -140,7 +150,7 @@ export class PostResolver {
     //   [id]
     // );
 
-    return await Post.findOne(id, { relations: ["creator"] });
+    return await Post.findOne(id);
   }
 
   @Mutation(() => Post)
@@ -265,6 +275,26 @@ export class PostResolver {
   @FieldResolver(() => String)
   textSnippet(@Root() root: Post) {
     return root.text.slice(0, 100);
+  }
+
+  @FieldResolver(() => User)
+  async creator(@Root() root: Post, @Ctx() { userLoader }: MyContext) {
+    return await userLoader.load(root.creatorId);
+  }
+
+  @FieldResolver(() => Int, { nullable: true })
+  async voteStatus(
+    @Root() root: Post,
+    @Ctx() { updootLoader, req }: MyContext
+  ) {
+    if (!req.session.userId) return null;
+
+    const updoot = await updootLoader.load({
+      postId: root.id,
+      userId: req.session.userId,
+    });
+
+    return updoot ? updoot.value : null;
   }
 
   // @FieldResolver(() => Int, { nullable: true })
