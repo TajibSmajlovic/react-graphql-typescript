@@ -1,23 +1,26 @@
-import React, { useState } from "react";
+import React from "react";
 import NextLink from "next/link";
 import { Box, Button, Flex, Heading, Link, Stack, Text } from "@chakra-ui/core";
-import { withUrqlClient } from "next-urql";
 
 import Updoot from "../components/Updoot/Updoot";
 import { Layout } from "../components/Layout/Layout";
 import { EditDeletePostButtons } from "../components/Button/EditDeleteButton";
 import { useDeletePostMutation, usePostsQuery } from "../generated/graphql";
-import { createUrqlClient } from "../utils/createUrqlClient";
+import { withApollo } from "../utils/withApollo";
 
 const Index = () => {
-  const [variables, setVariables] = useState({
-    limit: 10,
-    cursor: null as null | string,
+  const { data, loading, fetchMore, variables } = usePostsQuery({
+    variables: {
+      limit: 10,
+      cursor: null,
+    },
+    notifyOnNetworkStatusChange: true,
   });
-  const [{ data, fetching }] = usePostsQuery({ variables });
-  const [, deletePost] = useDeletePostMutation();
+  const [deletePost] = useDeletePostMutation();
 
-  if (!fetching && !data) return <div>No posts!</div>;
+  // if (loading) return <div>Loading...</div>;
+
+  if (!loading && !data) return <div>No posts!</div>;
 
   return (
     <Layout>
@@ -32,7 +35,7 @@ const Index = () => {
       <br />
 
       <Stack spacing={8}>
-        {fetching && !data
+        {loading && !data
           ? "Loading..."
           : data!.getPosts.items.map((p) =>
               !p ? null : (
@@ -60,7 +63,12 @@ const Index = () => {
                           id={p.id}
                           creatorId={p.creator.id}
                           onDelete={() => {
-                            deletePost({ id: p.id });
+                            deletePost({
+                              variables: { id: p.id },
+                              update: (cache) => {
+                                cache.evict({ id: `Post:${p.id}` });
+                              },
+                            });
                           }}
                         />
                       </Box>
@@ -76,12 +84,15 @@ const Index = () => {
           <Button
             m="auto"
             my={8}
-            isLoading={fetching}
+            isLoading={loading}
             onClick={() =>
-              setVariables({
-                limit: variables.limit,
-                cursor:
-                  data.getPosts.items[data.getPosts.items.length - 1].createdAt,
+              fetchMore({
+                variables: {
+                  limit: variables!.limit,
+                  cursor:
+                    data.getPosts.items[data.getPosts.items.length - 1]
+                      .createdAt,
+                },
               })
             }
           >
@@ -93,4 +104,4 @@ const Index = () => {
   );
 };
 
-export default withUrqlClient(createUrqlClient, { ssr: true })(Index);
+export default withApollo({ ssr: true })(Index);

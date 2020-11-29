@@ -4,10 +4,10 @@ import { useRouter } from "next/router";
 import { useMeQuery } from "../../generated/graphql";
 
 export const useIsAuth = () => {
-  const [{ data, fetching }] = useMeQuery();
+  const { data, loading } = useMeQuery();
   const router = useRouter();
 
   useEffect(() => {
-    if (!fetching && !data?.me) router.replace(`/login?next=${router.route}`);
-  }, [data, router, fetching]);
+    if (!loading && !data?.me) router.replace(`/login?next=${router.route}`);
+  }, [data, router, loading]);
 };

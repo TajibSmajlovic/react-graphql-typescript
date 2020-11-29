@@ -7,13 +7,16 @@ import { useRouter } from "next/router";
 
 import { Wrapper } from "../../components/Layout/Wrapper";
 import { InputField } from "../../components/Form/InputField";
-import { useChangePasswordMutation } from "../../generated/graphql";
+import {
+  MeDocument,
+  MeQuery,
+  useChangePasswordMutation,
+} from "../../generated/graphql";
 import { toErrorMap } from "../../utils/toErrorMap";
-import { withUrqlClient } from "next-urql";
-import { createUrqlClient } from "../../utils/createUrqlClient";
+import { withApollo } from "../../utils/withApollo";
 
 const ChangePassword: NextPage = () => {
-  const [, changePassword] = useChangePasswordMutation();
+  const [changePassword] = useChangePasswordMutation();
   const [tokenError, setTokenError] = useState("");
   const router = useRouter();
 
@@ -23,9 +26,23 @@ const ChangePassword: NextPage = () => {
         initialValues={{ newPassword: "" }}
         onSubmit={async (values, { setErrors }) => {
           const response = await changePassword({
-            token:
-              typeof router.query.token === "string" ? router.query.token : "",
-            newPassword: values.newPassword,
+            variables: {
+              token:
+                typeof router.query.token === "string"
+                  ? router.query.token
+                  : "",
+              newPassword: values.newPassword,
+            },
+            update: (cache, { data }) => {
+              cache.writeQuery<MeQuery>({
+                query: MeDocument,
+                data: {
+                  __typename: "Query",
+                  me: data?.changePassword.user,
+                },
+              });
+              cache.evict({ fieldName: "getPosts" });
+            },
           });
 
           if (response.data?.changePassword.errors) {
@@ -74,4 +91,4 @@ const ChangePassword: NextPage = () => {
 //   return { token: query.token as string };
 // };
 
-export default withUrqlClient(createUrqlClient)(ChangePassword);
+export default withApollo({ ssr: false })(ChangePassword);

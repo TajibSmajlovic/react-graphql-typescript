@@ -18,7 +18,7 @@ export const EditDeletePostButtons: React.FC<EditDeletePostButtonsProps> = ({
   isDeleting,
   onDelete,
 }) => {
-  const [{ data: meData }] = useMeQuery();
+  const { data: meData } = useMeQuery();
 
   if (meData?.me?.id !== creatorId) return null;
 

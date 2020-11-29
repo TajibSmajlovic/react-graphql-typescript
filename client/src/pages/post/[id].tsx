@@ -1,24 +1,23 @@
 import React from "react";
 import { useRouter } from "next/router";
-import { withUrqlClient } from "next-urql";
 
 import { Heading, Box } from "@chakra-ui/core";
-import { createUrqlClient } from "../../utils/createUrqlClient";
 import { Layout } from "../../components/Layout/Layout";
 import { useDeletePostMutation, usePostQuery } from "../../generated/graphql";
 import { EditDeletePostButtons } from "../../components/Button/EditDeleteButton";
+import { withApollo } from "../../utils/withApollo";
 
 const Post = ({}) => {
   const router = useRouter();
   const id =
     typeof router.query.id === "string" ? parseInt(router.query.id) : -1;
-  const [{ data, error, fetching }] = usePostQuery({
-    pause: id === -1,
+  const { data, error, loading } = usePostQuery({
+    skip: id === -1,
     variables: { id },
   });
-  const [{ fetching: isDeleting }, deletePost] = useDeletePostMutation();
+  const [deletePost, { loading: isDeleting }] = useDeletePostMutation();
 
-  if (fetching)
+  if (loading)
     return (
       <Layout>
         <div>loading...</div>
@@ -43,7 +42,12 @@ const Post = ({}) => {
         creatorId={data.getPost.creator.id}
         isDeleting={isDeleting}
         onDelete={async () => {
-          await deletePost({ id: data.getPost?.id as number });
+          await deletePost({
+            variables: { id: data.getPost?.id as number },
+            update: (cache) => {
+              cache.evict({ id: `Post:${p.id}` });
+            },
+          });
           router.back();
         }}
       />
@@ -51,4 +55,4 @@ const Post = ({}) => {
   );
 };
 
-export default withUrqlClient(createUrqlClient, { ssr: true })(Post);
+export default withApollo({ ssr: true })(Post);

@@ -1,18 +1,64 @@
 import React, { useState } from "react";
+import gql from "graphql-tag";
+import { ApolloCache } from "@apollo/client";
 import { Flex, IconButton } from "@chakra-ui/core";
 import { ChevronDownIcon, ChevronUpIcon } from "@chakra-ui/icons";
 
-import { PostSnippetFragment, useVoteMutation } from "../../generated/graphql";
+import {
+  PostSnippetFragment,
+  useVoteMutation,
+  VoteMutation,
+} from "../../generated/graphql";
+import { withApollo } from "../../utils/withApollo";
 
 interface UpdootProps {
   post: PostSnippetFragment;
 }
 
+const updateAfterVote = (
+  value: number,
+  postId: number,
+  cache: ApolloCache<VoteMutation>
+) => {
+  const data = cache.readFragment<{
+    id: number;
+    points: number;
+    voteStatus: number | null;
+  }>({
+    id: `Post:${postId}`,
+    fragment: gql`
+      fragment _ on Post {
+        id
+        points
+        voteStatus
+      }
+    `,
+  });
+
+  if (data) {
+    if (data.voteStatus === value) return;
+
+    const newPoints =
+      (data.points as number) + (!data.voteStatus ? 1 : 2) * value;
+
+    cache.writeFragment({
+      id: `Post:${postId}`,
+      fragment: gql`
+        fragment __ on Post {
+          points
+          voteStatus
+        }
+      `,
+      data: { points: newPoints, voteStatus: value },
+    });
+  }
+};
+
 const Updoot: React.FC<UpdootProps> = ({ post }) => {
   const [loadingState, setLoadingState] = useState<
     "updoot-loading" | "downdoot-loading" | "not-loading"
   >("not-loading");
-  const [, vote] = useVoteMutation();
+  const [vote] = useVoteMutation();
 
   return (
     <Flex direction="column" justifyContent="center" alignItems="center" mr={4}>
@@ -22,8 +68,11 @@ const Updoot: React.FC<UpdootProps> = ({ post }) => {
 
           setLoadingState("updoot-loading");
           await vote({
-            postId: post.id,
-            value: 1,
+            variables: {
+              postId: post.id,
+              value: 1,
+            },
+            update: (cache) => updateAfterVote(1, post.id, cache),
           });
           setLoadingState("not-loading");
         }}
@@ -40,8 +89,11 @@ const Updoot: React.FC<UpdootProps> = ({ post }) => {
 
           setLoadingState("downdoot-loading");
           await vote({
-            postId: post.id,
-            value: -1,
+            variables: {
+              postId: post.id,
+              value: -1,
+            },
+            update: (cache) => updateAfterVote(-1, post.id, cache),
           });
           setLoadingState("not-loading");
         }}
@@ -55,4 +107,4 @@ const Updoot: React.FC<UpdootProps> = ({ post }) => {
   );
 };
 
-export default Updoot;
+export default withApollo({ ssr: false })(Updoot);
