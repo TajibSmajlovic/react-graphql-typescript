@@ -40,10 +40,10 @@ export class PostResolver {
   @Query(() => PaginatedPostsResponse)
   async getPosts(
     @Arg("limit", () => Int) limit: number,
-    @Arg("cursor", () => String, { nullable: true }) cursor: string | null,
-    @Ctx() { req }: MyContext // , @Info() info: any
+    @Arg("cursor", () => String, { nullable: true }) cursor: string | null
+    // @Ctx() { req }: MyContext // , @Info() info: any
   ): Promise<PaginatedPostsResponse> {
-    const loggedInUserId = req.session.userId;
+    // const loggedInUserId = req.session.userId;
     const realLimit = Math.min(50, limit) + 1;
     const realLimitPlusOne = realLimit + 1;
     // const queryBuilder = getConnection()

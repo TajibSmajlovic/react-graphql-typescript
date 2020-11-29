@@ -33,12 +33,13 @@ const main = async () => {
   // await Post.delete({});
 
   // connection.runMigrations();
-  // console.log(connection);
+  console.log(connection);
 
   const app = express();
   const RedisStore = connectRedis(session);
   const redis = new Redis();
 
+  // app.set("trust proxy", 1);
   app.use(
     cors({
       origin: "http://localhost:3000",
